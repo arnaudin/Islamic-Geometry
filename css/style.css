@@ -137,3 +137,97 @@ canvas {
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
     background-color: #1a1a1a;
 }
+
+/* UI Refinements */
+.label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.label-row label {
+    font-size: 0.9rem;
+    font-weight: 300;
+    color: #aaa;
+}
+
+/* Tooltip - improved */
+.tooltip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: help;
+    color: var(--accent-color);
+    margin-left: 0.5rem;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    position: relative;
+    /* Anchor for absolute positioning */
+}
+
+.tooltip:hover {
+    opacity: 1;
+}
+
+.tooltip:hover::after {
+    content: attr(data-text);
+    position: absolute;
+    /* Position below the icon */
+    top: 100%;
+    right: 0;
+    /* Or center it: left: 50%; transform: translateX(-50%); */
+    /* To avoid clipping on right edge, let's align right edge to icon right edge */
+
+    min-width: 200px;
+    background: #333;
+    color: #fff;
+    padding: 0.8rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    /* Ensure high z-index */
+    border: 1px solid #555;
+    pointer-events: none;
+    white-space: normal;
+    margin-top: 5px;
+    /* Spacing */
+}
+
+/* Number Input Container */
+.number-input-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.2rem;
+    justify-content: flex-end;
+    /* Align to right */
+}
+
+input[type="range"] {
+    flex-grow: 1;
+}
+
+input[type="number"] {
+    width: 70px;
+    background: #2c2c2c;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    border-radius: 4px;
+    padding: 0.4rem;
+    text-align: right;
+    font-family: var(--font-family);
+    font-size: 0.9rem;
+}
+
+input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.unit {
+    font-size: 0.9rem;
+    color: #888;
+    width: 1rem;
+}

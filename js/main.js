@@ -6,13 +6,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctx = canvas.getContext('2d');
 
     // UI Elements
+    // UI Elements
     const gridTypeSelect = document.getElementById('gridType');
+
+    // Tile Count
     const tileCountInput = document.getElementById('tileCount');
-    const tileCountVal = document.getElementById('tileCountVal');
+    const tileCountNum = document.getElementById('tileCountNum');
+
+    // Contact Point
     const contactPointInput = document.getElementById('contactPoint');
-    const contactPointVal = document.getElementById('contactPointVal');
+    const contactPointNum = document.getElementById('contactPointNum');
+
+    // Crossing Angle
     const crossingAngleInput = document.getElementById('crossingAngle');
-    const crossingAngleVal = document.getElementById('crossingAngleVal');
+    const crossingAngleNum = document.getElementById('crossingAngleNum');
+
     const showConstructionCheck = document.getElementById('showConstruction');
     const patternColorInput = document.getElementById('patternColor');
     const constructionColorInput = document.getElementById('constructionColor');
@@ -96,6 +104,21 @@ document.addEventListener('DOMContentLoaded', () => {
         renderer.drawPattern(ctx, pattern, state.patternColor);
     }
 
+    // HELPER: Sync inputs
+    function syncInputs(source, target, isPercentage = false) {
+        if (isPercentage) {
+            // Source is Range (0-0.5) -> Target is Num (0-50)
+            if (source.type === 'range') {
+                target.value = Math.round(source.value * 100);
+            } else {
+                // Source is Num (0-50) -> Target is Range (0-0.5)
+                target.value = source.value / 100;
+            }
+        } else {
+            target.value = source.value;
+        }
+    }
+
     // Event Listeners
     gridTypeSelect.addEventListener('change', (e) => {
         state.gridType = e.target.value;
@@ -103,24 +126,66 @@ document.addEventListener('DOMContentLoaded', () => {
         updateGeometry();
     });
 
-    tileCountInput.addEventListener('input', (e) => {
-        state.tileCount = parseInt(e.target.value);
-        tileCountVal.textContent = state.tileCount;
+    // Tile Count
+    function updateTileCount(val) {
+        state.tileCount = parseInt(val);
         state.gridSize = state.width / state.tileCount;
         updateGeometry();
+    }
+
+    tileCountInput.addEventListener('input', (e) => {
+        syncInputs(tileCountInput, tileCountNum);
+        updateTileCount(e.target.value);
     });
+
+    tileCountNum.addEventListener('input', (e) => {
+        let val = parseInt(e.target.value);
+        if (val < 2) val = 2;
+        if (val > 36) val = 36;
+        syncInputs(tileCountNum, tileCountInput);
+        updateTileCount(val);
+    });
+
+    // Contact Point
+    function updateContactPoint(val) { // val is 0-0.5 from slider
+        state.contactT = parseFloat(val);
+        updateGeometry();
+    }
 
     contactPointInput.addEventListener('input', (e) => {
-        state.contactT = parseFloat(e.target.value);
-        contactPointVal.textContent = state.contactT.toFixed(2);
-        updateGeometry();
+        syncInputs(contactPointInput, contactPointNum, true); // true for percentage
+        updateContactPoint(e.target.value);
     });
 
-    crossingAngleInput.addEventListener('input', (e) => {
-        state.angle = parseInt(e.target.value);
-        crossingAngleVal.textContent = state.angle + '°';
-        updateGeometry();
+    contactPointNum.addEventListener('input', (e) => {
+        let val = parseFloat(e.target.value);
+        if (val < 0) val = 0;
+        if (val > 50) val = 50;
+        // Manual sync back to slider
+        contactPointInput.value = val / 100;
+        updateContactPoint(val / 100);
     });
+
+    // Crossing Angle
+    function updateAngle(val) {
+        state.angle = parseInt(val);
+        updateGeometry();
+    }
+
+    crossingAngleInput.addEventListener('input', (e) => {
+        syncInputs(crossingAngleInput, crossingAngleNum);
+        updateAngle(e.target.value);
+    });
+
+    crossingAngleNum.addEventListener('input', (e) => {
+        let val = parseInt(e.target.value);
+        if (val < 15) val = 15;
+        if (val > 89) val = 89;
+
+        syncInputs(crossingAngleNum, crossingAngleInput);
+        updateAngle(val);
+    });
+
 
     showConstructionCheck.addEventListener('change', (e) => {
         state.showConstruction = e.target.checked;
