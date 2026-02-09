@@ -79,14 +79,34 @@
                 <input type="color" id="constructionColor" value="#555555">
             </div>
 
-
-
+            <button id="editTileBtn" class="secondary-btn">Edit Tile Motif</button>
             <button id="downloadBtn" class="primary-btn">Download SVG</button>
         </aside>
         
         <main class="canvas-container">
             <canvas id="mainCanvas"></canvas>
         </main>
+    </div>
+
+    <!-- Tile Editor Modal -->
+    <div id="editorModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Tile Motif</h2>
+                <button id="closeModalBtn" class="icon-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <canvas id="editorCanvas" width="500" height="500"></canvas>
+                <div class="editor-controls">
+                    <p class="instruction">
+                        <strong>Left Click</strong> to Toggle Segment Visibility<br>
+                        <strong>Right Click</strong> to Cycle Colors
+                    </p>
+                    <button id="resetMotifBtn" class="secondary-btn">Reset Motif</button>
+                    <button id="applyMotifBtn" class="primary-btn">Apply Changes</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="js/main.js"></script>

@@ -1,3 +1,4 @@
+import { TileEditor } from './editor.js';
 import { Renderer } from './renderer.js';
 import { Grid, Pattern } from './geometry.js';
 
@@ -26,6 +27,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const constructionColorInput = document.getElementById('constructionColor');
     const downloadBtn = document.getElementById('downloadBtn');
 
+    // Editor UI
+    const editTileBtn = document.getElementById('editTileBtn');
+    const editorModal = document.getElementById('editorModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const editorCanvas = document.getElementById('editorCanvas');
+    const resetMotifBtn = document.getElementById('resetMotifBtn');
+    const applyMotifBtn = document.getElementById('applyMotifBtn');
+
     // Instantiate classes
     const renderer = new Renderer();
     const grid = new Grid(800, 800);
@@ -42,7 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
         constructionColor: constructionColorInput.value,
         width: 800,
         height: 800,
-        gridSize: 100 // Tweakable
+        gridSize: 100, // Tweakable
+        motifConfig: { // Current motif overrides
+            hiddenSegments: new Set(),
+            colors: new Map()
+        }
     };
 
     function resizeCanvas() {
@@ -85,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Compute Pattern
-        pattern.compute(state.contactT, state.angle);
+        pattern.compute(state.contactT, state.angle, state.motifConfig);
 
         render();
     }
@@ -214,6 +227,59 @@ document.addEventListener('DOMContentLoaded', () => {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    });
+
+    // Editor Instance
+    let tileEditor = null;
+
+    // Editor Logic
+    editTileBtn.addEventListener('click', () => {
+        editorModal.classList.remove('hidden');
+
+        if (!tileEditor) {
+            tileEditor = new TileEditor(editorCanvas, (newConfig) => {
+                // Live preview? Or wait for Apply?
+                // Let's just update local state, main grid updates on Apply
+            });
+        }
+
+        // Push current main parameters to editor
+        tileEditor.setParams({
+            gridType: state.gridType,
+            contactT: state.contactT,
+            angle: state.angle
+        }, state.motifConfig);
+
+        tileEditor.render();
+    });
+
+    closeModalBtn.addEventListener('click', () => {
+        editorModal.classList.add('hidden');
+    });
+
+    resetMotifBtn.addEventListener('click', () => {
+        if (tileEditor) {
+            tileEditor.motifConfig = { hiddenSegments: new Set(), colors: new Map() };
+            tileEditor.updateGeometry();
+        }
+    });
+
+    applyMotifBtn.addEventListener('click', () => {
+        if (tileEditor) {
+            state.motifConfig = {
+                hiddenSegments: new Set(tileEditor.motifConfig.hiddenSegments),
+                colors: new Map(tileEditor.motifConfig.colors)
+            };
+            updateGeometry();
+            editorModal.classList.add('hidden');
+        }
+    });
+
+    // Close modal on click outside
+    window.addEventListener('click', (e) => {
+        if (e.target === editorModal) {
+            editorModal.classList.add('hidden');
+        }
     });
 
     // Boot up

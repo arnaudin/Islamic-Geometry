@@ -122,48 +122,41 @@ export class Grid {
     }
 }
 
-// Helper: Line-Line intersection
+// Helper: Segment-Segment intersection
+function getSegmentIntersection(p1, p2, p3, p4) {
+    const x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
+    const x3 = p3.x, y3 = p3.y, x4 = p4.x, y4 = p4.y;
+
+    const denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+    if (denom === 0) return null; // Parallel
+
+    const ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom;
+    const ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom;
+
+    if (ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1) {
+        return new Point(
+            x1 + ua * (x2 - x1),
+            y1 + ua * (y2 - y1)
+        );
+    }
+    return null;
+}
+
+// Helper: Line-Line intersection (Infinite lines)
 function getIntersection(p1, angle1, p2, angle2) {
-    // p1 + t * v1 = p2 + u * v2
-    // v1 = (cos(a1), sin(a1))
-    // v2 = (cos(a2), sin(a2))
-
-    // x1 + t*vx1 = x2 + u*vx2
-    // y1 + t*vy1 = y2 + u*vy2
-
     const vx1 = Math.cos(angle1);
     const vy1 = Math.sin(angle1);
     const vx2 = Math.cos(angle2);
     const vy2 = Math.sin(angle2);
 
-    // Solve for t and u
-    // t = ((x2-x1)*vy2 - (y2-y1)*vx2) / (vx1*vy2 - vy1*vx2)
-
     const det = vx1 * vy2 - vy1 * vx2;
     if (Math.abs(det) < 0.00001) return null; // Parallel
 
     const t = ((p2.x - p1.x) * vy2 - (p2.y - p1.y) * vx2) / det;
-
-    // Check if t is positive? Not necessarily, but for rays yes.
-    // If t < 0 it's "behind" the ray start.
-    if (t < 0) return null;
-
-    // Check u as well
-    // x1 + t*vx1 = x2 + u*vx2 => u = (x1-x2 + t*vx1)/vx2 (if vx2 != 0)
-    // Or solve system for u:
-    // u = ((x2-x1)*vy1 - (y2-y1)*vx1) / det -- Check this derivation?
-    // t * det = ...
-    // u * det = (p2-p1) cross v1? No.
-    // p1 - p2 = u*v2 - t*v1.
-    // Cross with v1: (p1-p2) x v1 = u*(v2 x v1).
-    // u = ((p1-p2) x v1) / (v2 x v1) = ((p1-p2) x v1) / (-det).
-    // u = ((x1-x2)*vy1 - (y1-y2)*vx1) / (-det).
-    // u = -((x1-x2)*vy1 - (y1-y2)*vx1) / det
-    // u = ((x2-x1)*vy1 - (y2-y1)*vx1) / det
-
     const u = ((p2.x - p1.x) * vy1 - (p2.y - p1.y) * vx1) / det;
 
-    if (u < 0) return null;
+    // We only care if it intersects "forward" from the start points
+    if (t < 0 || u < 0) return null;
 
     return new Point(
         p1.x + t * vx1,
@@ -171,70 +164,189 @@ function getIntersection(p1, angle1, p2, angle2) {
     );
 }
 
-export class Pattern {
-    constructor(grid) {
-        this.grid = grid;
-        this.lines = []; // Array of {p1, p2}
+export class Motif {
+    constructor(sides, size) {
+        this.sides = sides;
+        this.size = size;
+        this.segments = []; // The final trimmed/split segments
     }
 
     compute(contactT, angleDeg) {
-        this.lines = [];
+        // 1. Generate Raw Hankin Segments for a single centered polygon
+        const rawSegments = [];
+        const vertices = [];
+
+        // Generate vertices matching the Grid generation logic (centered at 0,0)
+        if (this.sides === 4) {
+            // Square
+            const s = this.size;
+            const h = s / 2;
+            vertices.push(new Point(-h, -h));
+            vertices.push(new Point(h, -h));
+            vertices.push(new Point(h, h));
+            vertices.push(new Point(-h, h));
+        } else {
+            // Hexagon
+            const r = this.size;
+            for (let k = 0; k < 6; k++) {
+                const ang = (30 + 60 * k) * (Math.PI / 180);
+                vertices.push(new Point(r * Math.cos(ang), r * Math.sin(ang)));
+            }
+        }
+
         const angleRad = angleDeg * (Math.PI / 180);
+        const len = vertices.length;
 
-        this.grid.polygons.forEach(poly => {
-            const verts = poly.vertices;
-            const len = verts.length;
+        // Generate the V-shapes at each corner
+        for (let i = 0; i < len; i++) {
+            const currV = vertices[i];
+            const prevV = vertices[(i - 1 + len) % len];
+            const nextV = vertices[(i + 1) % len];
 
-            for (let i = 0; i < len; i++) {
-                const currV = verts[i];
-                const prevV = verts[(i - 1 + len) % len];
-                const nextV = verts[(i + 1) % len];
+            const v1 = { x: prevV.x - currV.x, y: prevV.y - currV.y };
+            const v2 = { x: nextV.x - currV.x, y: nextV.y - currV.y };
 
-                // Edge 1: currV -> prevV (Vector pointing AWAYS from corner along edge)
-                const v1 = { x: prevV.x - currV.x, y: prevV.y - currV.y };
-                const v2 = { x: nextV.x - currV.x, y: nextV.y - currV.y };
+            const c1 = new Point(currV.x + v1.x * contactT, currV.y + v1.y * contactT);
+            const c2 = new Point(currV.x + v2.x * contactT, currV.y + v2.y * contactT);
 
-                // Contact points
-                const c1 = new Point(
-                    currV.x + v1.x * contactT,
-                    currV.y + v1.y * contactT
-                );
+            const ang1 = Math.atan2(v1.y, v1.x);
+            const ang2 = Math.atan2(v2.y, v2.x);
 
-                const c2 = new Point(
-                    currV.x + v2.x * contactT,
-                    currV.y + v2.y * contactT
-                );
+            let diff = ang2 - ang1;
+            while (diff <= -Math.PI) diff += 2 * Math.PI;
+            while (diff > Math.PI) diff -= 2 * Math.PI;
 
-                // Angles of edges (pointing AWAY from corner)
-                const ang1 = Math.atan2(v1.y, v1.x);
-                const ang2 = Math.atan2(v2.y, v2.x);
+            let r1a, r2a;
+            if (diff > 0) {
+                r1a = ang1 + angleRad;
+                r2a = ang2 - angleRad;
+            } else {
+                r1a = ang1 - angleRad;
+                r2a = ang2 + angleRad;
+            }
 
-                // Determine direction to turn 'inwards'
-                let diff = ang2 - ang1;
-                while (diff <= -Math.PI) diff += 2 * Math.PI;
-                while (diff > Math.PI) diff -= 2 * Math.PI;
+            const intersect = getIntersection(c1, r1a, c2, r2a);
 
-                // If diff > 0, we turn CCW from V1 to V2.
-                // So V2 is "Left" of V1.
-                // To point "inwards" from V1, we add angle.
-                // To point "inwards" from V2, we subtract angle.
+            if (intersect) {
+                // Raw segments. ID base: corner index * 2 (+0 or +1)
+                rawSegments.push({ p1: c1, p2: intersect, baseId: i * 2 });
+                rawSegments.push({ p1: c2, p2: intersect, baseId: i * 2 + 1 });
+            }
+        }
 
-                let r1a, r2a;
-                if (diff > 0) {
-                    r1a = ang1 + angleRad;
-                    r2a = ang2 - angleRad;
-                } else {
-                    r1a = ang1 - angleRad;
-                    r2a = ang2 + angleRad;
-                }
+        // 2. Trimming Pass: Find Split Points
+        const splits = rawSegments.map(() => [0, 1]); // Always include start(0) and end(1)
 
-                const intersect = getIntersection(c1, r1a, c2, r2a);
+        for (let i = 0; i < rawSegments.length; i++) {
+            for (let j = i + 1; j < rawSegments.length; j++) {
+                const s1 = rawSegments[i];
+                const s2 = rawSegments[j];
 
-                if (intersect) {
-                    this.lines.push({ p1: c1, p2: intersect });
-                    this.lines.push({ p1: c2, p2: intersect });
+                const p = getSegmentIntersection(s1.p1, s1.p2, s2.p1, s2.p2);
+                if (p) {
+                    // Calculate T on s1
+                    const d1x = s1.p2.x - s1.p1.x;
+                    const d1y = s1.p2.y - s1.p1.y;
+                    const l1Sq = d1x * d1x + d1y * d1y;
+                    let t1 = ((p.x - s1.p1.x) * d1x + (p.y - s1.p1.y) * d1y) / l1Sq;
+
+                    // Calculate T on s2
+                    const d2x = s2.p2.x - s2.p1.x;
+                    const d2y = s2.p2.y - s2.p1.y;
+                    const l2Sq = d2x * d2x + d2y * d2y;
+                    let t2 = ((p.x - s2.p1.x) * d2x + (p.y - s2.p1.y) * d2y) / l2Sq;
+
+                    if (t1 > 0.001 && t1 < 0.999) splits[i].push(t1);
+                    if (t2 > 0.001 && t2 < 0.999) splits[j].push(t2);
                 }
             }
+        }
+
+        // 3. Generate Sub-Segments
+        this.segments = [];
+
+        rawSegments.forEach((seg, i) => {
+            const tVals = [...new Set(splits[i])].sort((a, b) => a - b);
+
+            for (let k = 0; k < tVals.length - 1; k++) {
+                const tStart = tVals[k];
+                const tEnd = tVals[k + 1];
+
+                const pStart = new Point(
+                    seg.p1.x + (seg.p2.x - seg.p1.x) * tStart,
+                    seg.p1.y + (seg.p2.y - seg.p1.y) * tStart
+                );
+
+                const pEnd = new Point(
+                    seg.p1.x + (seg.p2.x - seg.p1.x) * tEnd,
+                    seg.p1.y + (seg.p2.y - seg.p1.y) * tEnd
+                );
+
+                // Composite ID: BaseID_Index
+                const id = `${seg.baseId}_${k}`;
+
+                this.segments.push({
+                    p1: pStart,
+                    p2: pEnd,
+                    id: id
+                });
+            }
+        });
+    }
+}
+
+export class Pattern {
+    constructor(grid) {
+        this.grid = grid;
+        this.lines = []; // Array of {p1, p2, id, color}
+    }
+
+    /**
+     * Compute Instanced Pattern
+     * @param {number} contactT 
+     * @param {number} angleDeg 
+     * @param {Object} motifConfig 
+     */
+    compute(contactT, angleDeg, motifConfig) {
+        this.lines = [];
+        const hidden = motifConfig && motifConfig.hiddenSegments ? motifConfig.hiddenSegments : new Set();
+        const colors = motifConfig && motifConfig.colors ? motifConfig.colors : new Map();
+
+        // Detect Grid Type/Size to create correct Motif
+        if (this.grid.polygons.length === 0) return;
+
+        const sides = this.grid.polygons[0].vertices.length;
+
+        // Determine Size (Radius for Hex, Side/1 for Square?)
+        const edgeLen = new Edge(this.grid.polygons[0].vertices[0], this.grid.polygons[0].vertices[1]).getLength();
+        let size;
+        if (sides === 4) {
+            size = edgeLen;
+        } else {
+            size = edgeLen; // For Hex, side length equals radius 
+        }
+
+        const motif = new Motif(sides, size);
+        motif.compute(contactT, angleDeg);
+
+        // Instance the Motif for every polygon
+        this.grid.polygons.forEach(poly => {
+            const center = poly.center;
+
+            motif.segments.forEach(seg => {
+                if (hidden.has(seg.id)) return;
+
+                // Translate
+                const p1 = new Point(seg.p1.x + center.x, seg.p1.y + center.y);
+                const p2 = new Point(seg.p2.x + center.x, seg.p2.y + center.y);
+
+                this.lines.push({
+                    p1: p1,
+                    p2: p2,
+                    id: seg.id,
+                    color: colors.get(seg.id) || null
+                });
+            });
         });
 
         return this.lines;
